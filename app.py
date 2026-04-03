@@ -92,7 +92,11 @@ df = pd.read_csv("kc_house_data.csv")
 # =========================
 # 2. Train or Load Model & Scaler
 # =========================
+MODEL_FILE = "house_model.pkl"
+SCALER_FILE = "scaler.pkl"
+
 if not os.path.exists(MODEL_FILE) or not os.path.exists(SCALER_FILE):
+    # download or create model/scaler
     # Train the model
     # Features and targets
     features = ['bedrooms','bathrooms','sqft_living','sqft_lot','floors']
