@@ -239,23 +239,21 @@ elif page == "📊 Visualization":
 # =========================
 elif page == "🔍 Explainability (SHAP)":
     st.header("Feature Importance via SHAP")
-    
+
     features = ['bedrooms','bathrooms','sqft_living','sqft_lot','floors']
-    X_for_shap = df[features].values  # use raw features, not scaled
-    targets = ['price','sqft_living','bedrooms','bathrooms']
+    X_for_shap = df[features].values  # raw features
 
-    st.write("Model type:", type(model))
+    # Single-output RandomForestRegressor
+    if isinstance(model, RandomForestRegressor):
+        st.subheader("Feature Importance for Price")
+        explainer = shap.Explainer(model, X_for_shap)
+        shap_values = explainer(X_for_shap[:100], check_additivity=False)
+        shap.plots.bar(shap_values, show=False)
+        st.pyplot(plt.gcf())
 
-    if isinstance(model, MultiOutputRegressor):
-        for i, target in enumerate(targets):
-            st.subheader(f"Feature Importance for {target}")
-            single_model = model.estimators_[i]  # safe now
-            explainer = shap.Explainer(single_model, X_for_shap)
-            shap_values = explainer(X_for_shap[:100], check_additivity=False)
-            shap.plots.bar(shap_values, show=False)
-            st.pyplot(plt.gcf())
     else:
-        st.warning("SHAP explainability works only for MultiOutputRegressor models.")
+        st.warning("SHAP explainability works only for RandomForestRegressor or MultiOutputRegressor models.")
+
 # =========================
 # Recommendation Page
 # =========================
