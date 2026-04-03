@@ -27,10 +27,10 @@ if not os.path.exists("scaler.pkl"):
 
         # Load model and scaler
 with open("house_model.pkl", "rb") as f:
-    model = pickle.load(f)
+    model = joblib.load(f)
 
 with open("scaler.pkl", "rb") as f:
-    scaler = pickle.load(f)
+    scaler = joblib.load(f)
 
 # Load dataset
 df = pd.read_csv("kc_house_data.csv")
@@ -50,27 +50,50 @@ import matplotlib.pyplot as plt
 import pickle
 import plotly.express as px
 
-# =========================
-# 1. Load Dataset
-# =========================
-@st.cache_data
-def load_data():
-    return pd.read_csv("kc_house_data.csv")
+import requests
+import joblib
+import os
+import pandas as pd
 
-df = load_data()
+# =========================
+# Download files at runtime
+# =========================
+
+# URLs to your hosted files
+url_csv   = "https://raw.githubusercontent.com/yourusername/HOME-VALUE-/main/kc_house_data.csv"
+url_model = "https://raw.githubusercontent.com/yourusername/HOME-VALUE-/main/house_model.pkl"
+url_scaler = "https://raw.githubusercontent.com/yourusername/HOME-VALUE-/main/scaler.pkl"
+
+# Download CSV if not exists
+if not os.path.exists("kc_house_data.csv"):
+    r = requests.get(url_csv)
+    with open("kc_house_data.csv", "wb") as f:
+        f.write(r.content)
+
+# Download model if not exists
+if not os.path.exists("house_model.pkl"):
+    r = requests.get(url_model)
+    with open("house_model.pkl", "wb") as f:
+        f.write(r.content)
+
+# Download scaler if not exists
+if not os.path.exists("scaler.pkl"):
+    r = requests.get(url_scaler)
+    with open("scaler.pkl", "wb") as f:
+        f.write(f.content)
+
+# Load model & scaler using joblib
+model = joblib.load("house_model.pkl")
+scaler = joblib.load("scaler.pkl")
+
+# Load dataset
+df = pd.read_csv("kc_house_data.csv")
 
 # =========================
 # 2. Train or Load Model & Scaler
 # =========================
-MODEL_FILE = "house_model.pkl"
-SCALER_FILE = "scaler.pkl"
-
-if os.path.exists(MODEL_FILE) and os.path.exists(SCALER_FILE):
-    with open(MODEL_FILE, "rb") as f:
-        model = pickle.load(f)
-    with open(SCALER_FILE, "rb") as f:
-        scaler = pickle.load(f)
-else:
+if not os.path.exists(MODEL_FILE) or not os.path.exists(SCALER_FILE):
+    # Train the model
     # Features and targets
     features = ['bedrooms','bathrooms','sqft_living','sqft_lot','floors']
     targets = ['price','sqft_living','bedrooms','bathrooms']
@@ -182,7 +205,7 @@ if page == "🏡 Prediction":
         input_scaled = scaler.transform(input_data)
         
         prediction = model.predict(input_scaled)  # shape: (1, n_targets)
-        prediction_value = floatprediction[0][0]         # get the first (and only) value
+        prediction_value = float(prediction[0][0])       # get the first (and only) value
 
         st.success(f"💰 Predicted Price: ${prediction_value:,.2f}")
 
