@@ -242,21 +242,20 @@ elif page == "🔍 Explainability (SHAP)":
     
     features = ['bedrooms','bathrooms','sqft_living','sqft_lot','floors']
     X_for_shap = df[features].values  # use raw features, not scaled
-
     targets = ['price','sqft_living','bedrooms','bathrooms']
 
-    for i, target in enumerate(targets):
-        st.subheader(f"Feature Importance for {target}")
-        single_model = model.estimators_[i]  # get individual RF for this target
+    st.write("Model type:", type(model))
 
-        # Initialize explainer (no check_additivity here)
-        explainer = shap.Explainer(single_model, X_for_shap)
-        
-        # Compute SHAP values with check_additivity=False
-        shap_values = explainer(X_for_shap[:100], check_additivity=False)
-
-        shap.plots.bar(shap_values, show=False)
-        st.pyplot(plt.gcf())
+    if isinstance(model, MultiOutputRegressor):
+        for i, target in enumerate(targets):
+            st.subheader(f"Feature Importance for {target}")
+            single_model = model.estimators_[i]  # safe now
+            explainer = shap.Explainer(single_model, X_for_shap)
+            shap_values = explainer(X_for_shap[:100], check_additivity=False)
+            shap.plots.bar(shap_values, show=False)
+            st.pyplot(plt.gcf())
+    else:
+        st.warning("SHAP explainability works only for MultiOutputRegressor models.")
 # =========================
 # Recommendation Page
 # =========================
