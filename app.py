@@ -1,3 +1,40 @@
+import requests
+import os
+import joblib
+import pandas as pd
+import pickle
+
+# ===============================
+# Download files if not exists
+# ===============================
+if not os.path.exists("kc_house_data.csv"):
+    url_csv = "https://link-to-your-kc_house_data.csv"
+    r = requests.get(url_csv)
+    with open("kc_house_data.csv", "wb") as f:
+        f.write(r.content)
+
+if not os.path.exists("house_model.pkl"):
+    url_model = "https://link-to-your-house_model.pkl"
+    r = requests.get(url_model)
+    with open("house_model.pkl", "wb") as f:
+        f.write(r.content)
+
+if not os.path.exists("scaler.pkl"):
+    url_scaler = "https://link-to-your-scaler.pkl"
+    r = requests.get(url_scaler)
+    with open("scaler.pkl", "wb") as f:
+        f.write(r.content)
+
+        # Load model and scaler
+with open("house_model.pkl", "rb") as f:
+    model = pickle.load(f)
+
+with open("scaler.pkl", "rb") as f:
+    scaler = pickle.load(f)
+
+# Load dataset
+df = pd.read_csv("kc_house_data.csv")
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -145,7 +182,7 @@ if page == "🏡 Prediction":
         input_scaled = scaler.transform(input_data)
         
         prediction = model.predict(input_scaled)  # shape: (1, n_targets)
-        prediction_value = prediction[0]          # get the first (and only) value
+        prediction_value = floatprediction[0][0]         # get the first (and only) value
 
         st.success(f"💰 Predicted Price: ${prediction_value:,.2f}")
 
