@@ -209,7 +209,8 @@ if page == "🏡 Prediction":
         input_scaled = scaler.transform(input_data)
         
         prediction = model.predict(input_scaled)  # shape: (1, n_targets)
-        prediction_value = float(prediction[0][0])       # get the first (and only) value
+        prediction_value = prediction[0]if prediction.ndim == 1 else prediction[0][0]  
+        prediction_value = float(prediction_value)    # get the first (and only) value
 
         st.success(f"💰 Predicted Price: ${prediction_value:,.2f}")
 
