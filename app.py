@@ -2,216 +2,136 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import datetime
-import os
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import shap
-import matplotlib.pyplot as plt
-import pickle
+import joblib
 import plotly.express as px
+import matplotlib.pyplot as plt
 
 # =========================
-# 1. Load Dataset
-# =========================
-@st.cache_data
-def load_data():
-    return pd.read_csv("kc_house_data.csv")
-
-df = load_data()
-
-# =========================
-# 2. Train or Load Model & Scaler
-# =========================
-MODEL_FILE = "house_model.pkl"
-SCALER_FILE = "scaler.pkl"
-
-if os.path.exists(MODEL_FILE) and os.path.exists(SCALER_FILE):
-    with open(MODEL_FILE, "rb") as f:
-        model = pickle.load(f)
-    with open(SCALER_FILE, "rb") as f:
-        scaler = pickle.load(f)
-else:
-    # Features and targets
-    features = ['bedrooms','bathrooms','sqft_living','sqft_lot','floors']
-    targets = ['price','sqft_living','bedrooms','bathrooms']
-
-    X = df[features]
-    y = df[targets]
-
-    # Fill missing values
-    X = X.fillna(0)
-    y = y.fillna(0)
-
-    # Split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    # Scale
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
-
-    # Train multi-output Random Forest
-    rf = RandomForestRegressor(n_estimators=50, max_depth=10, n_jobs=-1, random_state=42)
-    model = MultiOutputRegressor(rf)
-    model.fit(X_train_scaled, y_train)
-
-    # Save for future use
-    with open(MODEL_FILE, "wb") as f:
-        pickle.dump(model, f)
-    with open(SCALER_FILE, "wb") as f:
-        pickle.dump(scaler, f)
-
-# =========================
-# 3. Streamlit App Layout
+# PAGE CONFIG
 # =========================
 st.set_page_config(page_title="Smart House Price Predictor", layout="wide")
 st.title("🏠 Smart House Price Prediction System")
 
+# =========================
+# LOAD DATA
+# =========================
+@st.cache_data
+def load_data():
+    try:
+        return pd.read_csv("kc_house_data.csv")
+    except Exception as e:
+        st.error(f"Error loading dataset: {e}")
+        return pd.DataFrame()
+
+df = load_data()
+
+# =========================
+# LOAD MODEL (NO TRAINING)
+# =========================
+@st.cache_resource
+def load_model():
+    try:
+        model = joblib.load("house_model.pkl")
+        scaler = joblib.load("scaler.pkl")
+        return model, scaler
+    except Exception as e:
+        st.error(f"Model loading failed: {e}")
+        return None, None
+
+model, scaler = load_model()
+
+# =========================
+# SIDEBAR
+# =========================
 page = st.sidebar.radio("Navigation", [
-    "📈 Dashboard", # new page
+    "📈 Dashboard",
     "🏡 Prediction",
     "📊 Visualization",
-    "🔍 Explainability (SHAP)",
     "🤝 Recommendation",
     "📋 Dataset Info"
 ])
+
 # =========================
-# Dashboard Page
+# DASHBOARD
 # =========================
 if page == "📈 Dashboard":
     st.header("🏠 House Data Dashboard")
 
-    # KPI Cards
     c1, c2, c3 = st.columns(3)
-    c1.markdown(f"<div style='padding:20px; background-color:#1f77b4; color:white; border-radius:10px; text-align:center;'><h2>{len(df)}</h2><p>Total Houses</p></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div style='padding:20px; background-color:#ff7f0e; color:white; border-radius:10px; text-align:center;'><h2>${df['price'].mean():,.0f}</h2><p>Average Price</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div style='padding:20px; background-color:#2ca02c; color:white; border-radius:10px; text-align:center;'><h2>{df['sqft_living'].mean():,.0f}</h2><p>Average Living Area (sqft)</p></div>", unsafe_allow_html=True)
+    c1.metric("Total Houses", len(df))
+    c2.metric("Avg Price", f"${df['price'].mean():,.0f}")
+    c3.metric("Avg Living Area", f"{df['sqft_living'].mean():,.0f} sqft")
 
     st.markdown("---")
 
-    # Row 1: Distribution of Bedrooms & Bathrooms
     col1, col2 = st.columns(2)
 
-    bed_counts = df['bedrooms'].value_counts().sort_index().reset_index()
-    bed_counts.columns = ['bedrooms','count']
-    fig_bed = px.bar(bed_counts, x='bedrooms', y='count', text='count', title="Bedrooms Distribution")
-    fig_bed.update_layout(template="plotly_dark")
+    fig1 = px.histogram(df, x="price", title="Price Distribution")
+    fig2 = px.histogram(df, x="sqft_living", title="Living Area Distribution")
 
-    bath_counts = df['bathrooms'].value_counts().sort_index().reset_index()
-    bath_counts.columns = ['bathrooms','count']
-    fig_bath = px.bar(bath_counts, x='bathrooms', y='count', text='count', title="Bathrooms Distribution")
-    fig_bath.update_layout(template="plotly_dark")
-
-    col1.plotly_chart(fig_bed, use_container_width=True)
-    col2.plotly_chart(fig_bath, use_container_width=True)
-
-    # Row 2: Living Area & Price Distributions
-    col3, col4 = st.columns(2)
-
-    fig_sqft = px.histogram(df, x='sqft_living', nbins=50, title="Living Area Distribution")
-    fig_sqft.update_layout(template="plotly_dark")
-
-    fig_price = px.histogram(df, x='price', nbins=50, title="Price Distribution")
-    fig_price.update_layout(template="plotly_dark")
-
-    col3.plotly_chart(fig_sqft, use_container_width=True)
-    col4.plotly_chart(fig_price, use_container_width=True)
-
-    # Row 3: Average Price by Floors
-    st.subheader("Average Price by Floors")
-    avg_price_floors = df.groupby('floors')['price'].mean().reset_index()
-    fig_avg_floors = px.bar(avg_price_floors, x='floors', y='price', text_auto='.2s', title="Average Price by Floors")
-    fig_avg_floors.update_layout(template="plotly_dark")
-    st.plotly_chart(fig_avg_floors, use_container_width=True)
+    col1.plotly_chart(fig1, use_container_width=True)
+    col2.plotly_chart(fig2, use_container_width=True)
 
 # =========================
-# Prediction Page
+# PREDICTION
 # =========================
-if page == "🏡 Prediction":
+elif page == "🏡 Prediction":
     st.header("Enter House Details")
 
-    bedrooms = st.number_input("Bedrooms", 0, 10, 3, step=1)
-    bathrooms = st.number_input("Bathrooms", 0.0, 10.0, 2.0, step=0.25)
-    sqft_living = st.number_input("Living Area (sqft)", 100, 10000, 2000, step=50)
-    sqft_lot = st.number_input("Lot Area (sqft)", 500, 50000, 5000, step=50)
-    floors = st.number_input("Floors", 1.0, 5.0, 1.0, step=0.5)
-    zipcode = st.selectbox("Zipcode", sorted(df['zipcode'].unique()))
+    bedrooms = st.number_input("Bedrooms", 0, 10, 3)
+    bathrooms = st.number_input("Bathrooms", 0.0, 10.0, 2.0)
+    sqft_living = st.number_input("Living Area (sqft)", 100, 10000, 2000)
+    sqft_lot = st.number_input("Lot Area (sqft)", 500, 50000, 5000)
+    floors = st.number_input("Floors", 1.0, 5.0, 1.0)
 
     if st.button("Predict Price"):
-        input_data = np.array([[bedrooms, bathrooms, sqft_living, sqft_lot, floors]])
-        input_scaled = scaler.transform(input_data)
-        
-        prediction = model.predict(input_scaled)  # shape: (1, n_targets)
-        prediction_value = prediction[0]          # get the first (and only) value
+        if model is None or scaler is None:
+            st.error("Model not loaded properly")
+        else:
+            input_data = np.array([[bedrooms, bathrooms, sqft_living, sqft_lot, floors]])
+            input_scaled = scaler.transform(input_data)
 
-        st.success(f"💰 Predicted Price: ${prediction_value:,.2f}")
+            prediction = model.predict(input_scaled)
+            price = prediction[0][0]  # FIXED
 
-        # Save in session state
-        st.session_state["last_prediction"] = prediction_value
-        st.session_state["last_input"] = {
-            "bedrooms": bedrooms,
-            "bathrooms": bathrooms,
-            "sqft_living": sqft_living,
-            "sqft_lot": sqft_lot,
-            "floors": floors,
-            "zipcode": zipcode
-        }
+            st.success(f"💰 Predicted Price: ${price:,.2f}")
+
 # =========================
-# Visualization Page
+# VISUALIZATION
 # =========================
 elif page == "📊 Visualization":
     st.header("Data Insights")
-    st.subheader("Price Distribution")
+
     fig, ax = plt.subplots()
-    ax.hist(df['price'], bins=50, color="#1f77b4", alpha=0.7)
+    ax.hist(df['price'], bins=50)
     st.pyplot(fig)
 
 # =========================
-# SHAP Explainability
-# =========================
-elif page == "🔍 Explainability (SHAP)":
-    st.header("Feature Importance via SHAP")
-    
-    features = ['bedrooms','bathrooms','sqft_living','sqft_lot','floors']
-    X_for_shap = df[features].values  # use raw features, not scaled
-
-    targets = ['price','sqft_living','bedrooms','bathrooms']
-
-    for i, target in enumerate(targets):
-        st.subheader(f"Feature Importance for {target}")
-        single_model = model.estimators_[i]  # get individual RF for this target
-
-        # Initialize explainer (no check_additivity here)
-        explainer = shap.Explainer(single_model, X_for_shap)
-        
-        # Compute SHAP values with check_additivity=False
-        shap_values = explainer(X_for_shap[:100], check_additivity=False)
-
-        shap.plots.bar(shap_values, show=False)
-        st.pyplot(plt.gcf())
-# =========================
-# Recommendation Page
+# RECOMMENDATION
 # =========================
 elif page == "🤝 Recommendation":
     st.header("Property Recommendation")
-    budget = st.slider("Max Budget", 100_000, 2_000_000, 500_000, step=10_000)
+
+    budget = st.slider("Max Budget", 100000, 2000000, 500000)
     min_bedrooms = st.slider("Min Bedrooms", 1, 10, 3)
+
     filtered = df[(df['price'] <= budget) & (df['bedrooms'] >= min_bedrooms)]
+
     st.write(f"Showing {len(filtered)} properties")
-    st.dataframe(filtered[['price','bedrooms','bathrooms','sqft_living','zipcode']].sort_values('price').head(10))
+    st.dataframe(filtered[['price','bedrooms','bathrooms','sqft_living']].head(10))
 
 # =========================
-# Dataset Info
+# DATASET INFO
 # =========================
 elif page == "📋 Dataset Info":
     st.header("Dataset Overview")
-    st.write(f"Shape: {df.shape}")
+
+    st.write("Shape:", df.shape)
     st.write("Missing Values:")
     st.write(df.isnull().sum())
-    st.subheader("Summary Statistics")
+
+    st.subheader("Summary")
     st.write(df.describe())
+
     st.subheader("Timestamp")
     st.write(datetime.datetime.now())
