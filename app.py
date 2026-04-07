@@ -278,7 +278,7 @@ elif page == "EDA":
             x=x_axis,
             y=y_axis,
             color="bedrooms",
-            trendline="ols",
+            #trendline="ols",
             title=f"{x_axis} vs {y_axis}"
         )
 
