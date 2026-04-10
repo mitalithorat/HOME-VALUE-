@@ -1,0 +1,10 @@
+Model,MAE,RMSE,R2 Score
+Gradient Boosting,155148.77,239332.71,0.5918
+Cat Boost Regression,153411.16,247176.84,0.5646
+Random Forest,160663.66,248871.66,0.5586
+XGBoost Regressor,155725.56,249941.48,0.5548
+Linear Regression,173238.88,261300.02,0.5134
+Artificial Neural Network,174776.28,264365.22,0.5019
+KNN Regression,176406.25,269805.86,0.4812
+Decision Tree Regressor,211968.81,336882.78,0.1912
+Support Vector Regression,227292.02,387253.82,-0.0687
